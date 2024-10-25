@@ -216,15 +216,7 @@
             clearInterval(updateInterval);
         }
 
-        // Handle visibility change
-        document.addEventListener('visibilitychange', () => {
-            if (document.hidden) {
-                stopUpdates(); // Page is hidden
-            } else {
-                startUpdates(); // Page is visible
-            }
-        });
-
+        // Initial page load setup
         document.addEventListener('DOMContentLoaded', () => {
             createBoard();
             renderBoard();
