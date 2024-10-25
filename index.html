@@ -23,18 +23,14 @@
             height: 100%;
             width: 100%;
         }
-        #game-board {
-            display: grid;
-            gap: 4px;
+        #game-board, .cell {
+            display: none;
         }
-        .cell {
-            width: 10px;
-            height: 10px;
-            border-radius: 2px;
-            background-color: #ebedf0;
-            border: 1px solid rgba(27, 31, 35, 0.06);
+        #game-canvas {
+            display: block;
+            margin: 0;
+            padding: 0;
         }
-
         #time-display {
             position: absolute;
             top: 10px;
@@ -55,32 +51,30 @@
 </head>
 <body>
     <div id="game-container">
-        <div id="game-board"></div>
+        <canvas id="game-canvas"></canvas>
         <div id="time-display" class="hidden"></div>
     </div>
     <script>
-        let rows = Math.floor(window.innerHeight / 14);
-        let cols = Math.floor(window.innerWidth / 14);
+        const canvas = document.getElementById('game-canvas');
+        const ctx = canvas.getContext('2d');
+        let rows, cols;
         let board = [];
         let calculationTimes = [];
         let rollingAverage = 0;
 
         function createBoard() {
-            const gameBoard = document.getElementById('game-board');
-            if (!gameBoard) {
-                console.error('Game board element not found');
-                return;
-            }
-            gameBoard.style.gridTemplateColumns = `repeat(${cols}, 10px)`;
-            
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+
+            const cellSize = 14;
+            rows = Math.floor(canvas.height / cellSize);
+            cols = Math.floor(canvas.width / cellSize);
+
+            board = [];
             for (let i = 0; i < rows; i++) {
                 board[i] = [];
                 for (let j = 0; j < cols; j++) {
-                    const cell = document.createElement('div');
-                    cell.classList.add('cell');
-                    gameBoard.appendChild(cell);
                     board[i][j] = {
-                        element: cell,
                         alive: Math.random() < 0.3
                     };
                 }
@@ -96,7 +90,7 @@
                 for (let j = 0; j < cols; j++) {
                     const cell = board[i][j];
                     const neighbors = countNeighbors(i, j);
-                    let alive;
+                    let alive = cell.alive;
 
                     if (cell.alive) {
                         alive = neighbors === 2 || neighbors === 3;
@@ -104,10 +98,7 @@
                         alive = neighbors === 3;
                     }
 
-                    newBoard[i][j] = {
-                        element: cell.element, // Preserve the element
-                        alive: alive,
-                    };
+                    newBoard[i][j] = { alive };
                 }
             }
 
@@ -115,7 +106,41 @@
             const endTime = performance.now();
             const calculationTime = endTime - startTime;
             updateRollingAverage(calculationTime);
+        }
+
+        function renderBoard() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            const cellSize = 14;
+
+            for (let i = 0; i < rows; i++) {
+                for (let j = 0; j < cols; j++) {
+                    const cell = board[i][j];
+                    if (cell.alive) {
+                        const neighbors = countNeighbors(i, j);
+                        let color;
+                        switch (Math.min(neighbors, 4)) {
+                            case 1: color = '#9be9a8'; break;
+                            case 2: color = '#40c463'; break;
+                            case 3: color = '#30a14e'; break;
+                            default: color = '#216e39';
+                        }
+                        ctx.fillStyle = color;
+                        ctx.fillRect(j * cellSize + 2, i * cellSize + 2, cellSize - 4, cellSize - 4);
+                    }
+                }
+            }
+        }
+
+        function animate() {
+            updateBoard();
             renderBoard();
+            requestAnimationFrame(animate);
+        }
+
+        function updateBoardSize() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+            createBoard();
         }
 
         function countNeighbors(row, col) {
@@ -131,36 +156,6 @@
                 }
             }
             return count;
-        }
-
-        function renderBoard() {
-            for (let i = 0; i < rows; i++) {
-                for (let j = 0; j < cols; j++) {
-                    const cell = board[i][j];
-                    if (cell && cell.element) {
-                        cell.element.className = 'cell';
-                        if (cell.alive) {
-                            const neighbors = countNeighbors(i, j);
-                            cell.element.classList.add(`alive-${Math.min(neighbors, 4)}`);
-                        }
-                    } else {
-                        console.warn(`Cell element not found at position (${i}, ${j})`);
-                    }
-                }
-            }
-        }
-
-        function updateBoardSize() {
-            rows = Math.floor(window.innerHeight / 14);
-            cols = Math.floor(window.innerWidth / 14);
-            
-            // Clear the existing board
-            const gameBoard = document.getElementById('game-board');
-            gameBoard.innerHTML = '';
-            
-            // Recreate the board with new dimensions
-            createBoard();
-            renderBoard();
         }
 
         function debounce(func, wait) {
@@ -201,36 +196,12 @@
             }
         });
 
-        // Reference to the update interval
-        let updateInterval;
-
-        // Function to start updates
-        function startUpdates() {
-            updateInterval = setInterval(() => {
-                updateBoard();
-            }, 100); // Update interval in milliseconds
-        }
-
-        // Function to stop updates
-        function stopUpdates() {
-            clearInterval(updateInterval);
-        }
-
-        // Handle visibility change
-        document.addEventListener('visibilitychange', () => {
-            if (document.hidden) {
-                stopUpdates(); // Page is hidden
-            } else {
-                startUpdates(); // Page is visible
-            }
-        });
-
         document.addEventListener('DOMContentLoaded', () => {
             createBoard();
             renderBoard();
-            startUpdates();
-            displayAverageTime(); // Initialize the display
-            document.getElementById('time-display').classList.add('hidden'); // Initially hide the time display
+            animate();
+            displayAverageTime();
+            document.getElementById('time-display').classList.add('hidden');
 
             const debouncedUpdateBoardSize = debounce(updateBoardSize, 250);
             window.addEventListener('resize', debouncedUpdateBoardSize);
